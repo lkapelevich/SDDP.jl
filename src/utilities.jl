@@ -157,7 +157,9 @@ savesolution!(solutionstore::Void, markov::Int, noiseidx::Int, sp::JuMP.Model, t
 
 
 function solvesubproblem!(direction, valuefunction, m::SDDPModel, sp::JuMP.Model)
-    @assert JuMP.solve(sp) == :Optimal
+    @timeit TO "forwardpass" begin
+        @assert JuMP.solve(sp) == :Optimal
+    end
 end
 solvesubproblem!(direction, m::SDDPModel, sp::JuMP.Model) = solvesubproblem!(direction, valueoracle(sp), m, sp)
 hasnoises(sp::JuMP.Model) = length(ext(sp).noises) > 0

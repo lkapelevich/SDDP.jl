@@ -8,8 +8,9 @@ __precompile__()
 
 module SDDP
 
-using JuMP, Distributions, JSON
+using JuMP, Distributions, JSON, TimerOutputs
 
+const TO = TimerOutput()
 const JuMPVERSION = Pkg.installed("JuMP")
 
 using Compat
@@ -261,8 +262,10 @@ function JuMP.solve(::Serial, m::SDDPModel, settings::Settings=Settings())
             settings.print_level > 1 && info("Running Cut Selection")
             for (t, stage) in enumerate(stages(m))
                 t == length(stages(m)) && continue
-                for sp in subproblems(stage)
-                    rebuildsubproblem!(m, sp)
+                @timeit TO "Rebuilding Subproblems" begin
+                    for sp in subproblems(stage)
+                        rebuildsubproblem!(m, sp)
+                    end
                 end
             end
         end
@@ -451,6 +454,9 @@ function JuMP.solve(m::SDDPModel;
         reduce_memory_footprint      = false,
         cut_output_file::String      = ""
     )
+    # reset the timings
+    reset_timer!(TO)
+
     settings = Settings(
         max_iterations,
         time_limit,
@@ -472,7 +478,9 @@ function JuMP.solve(m::SDDPModel;
     print(printheader, settings, m, solve_type)
     status = :solving
     try
-        status = solve(solve_type, m, settings)
+        @timeit TO "total" begin
+            status = solve(solve_type, m, settings)
+        end
     catch ex
         if isa(ex, InterruptException)
             warn("Terminating solve due to user interaction")
@@ -482,7 +490,7 @@ function JuMP.solve(m::SDDPModel;
         end
     end
     print(printfooter, settings, m, status)
-
+    print(show, settings, TO)
     status
 end
 

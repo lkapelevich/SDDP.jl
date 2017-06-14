@@ -118,10 +118,12 @@ function solvesubproblem!(::Type{BackwardPass}, vf::DefaultValueFunction, m::SDD
     if hasnoises(sp)
         for i in 1:length(ex.noiseprobability)
             setnoise!(sp, ex.noises[i])
-            if sp.solvehook == nothing
-                @assert JuMP.solve(sp) == :Optimal
-            else
-                @assert JuMP.solve(sp, require_duals = true) == :Optimal
+            @timeit TO "backward pass solve" begin
+                if sp.solvehook == nothing
+                    @assert JuMP.solve(sp) == :Optimal
+                else
+                    @assert JuMP.solve(sp, require_duals = true) == :Optimal
+                end
             end
             push!(m.storage.objective, getobjectivevalue(sp))
             push!(m.storage.noise, i)
@@ -132,10 +134,12 @@ function solvesubproblem!(::Type{BackwardPass}, vf::DefaultValueFunction, m::SDD
             saveduals!(m.storage.duals[end], sp)
         end
     else
-        if sp.solvehook == nothing
-            @assert JuMP.solve(sp) == :Optimal
-        else
-            @assert JuMP.solve(sp, require_duals = true) == :Optimal
+        @timeit TO "backward pass solve" begin
+            if sp.solvehook == nothing
+                @assert JuMP.solve(sp) == :Optimal
+            else
+                @assert JuMP.solve(sp, require_duals = true) == :Optimal
+            end
         end
         push!(m.storage.objective, getobjectivevalue(sp))
         push!(m.storage.noise, 0)

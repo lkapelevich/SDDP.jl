@@ -13,8 +13,10 @@ JuMP.getdual(x::State) = JuMP.getdual(x.constraint)
 states(sp::JuMP.Model) = ext(sp).states
 nstates(sp::JuMP.Model) = length(states(sp))
 function saveduals!(y, sp::JuMP.Model)
-    for (i, state) in enumerate(states(sp))
-        y[i] = getdual(state)
+    @timeit TO "Gettings duals" begin
+        for (i, state) in enumerate(states(sp))
+            y[i] = getdual(state)
+        end
     end
 end
 function savestates!(y, sp::JuMP.Model)
@@ -25,9 +27,11 @@ function savestates!(y, sp::JuMP.Model)
 end
 
 function setstates!(m, sp)
-    s = getstage(m, ext(sp).stage-1)
-    for (st, v) in zip(states(sp), s.state)
-        setvalue!(st, v)
+    @timeit TO "Setting states" begin
+        s = getstage(m, ext(sp).stage-1)
+        for (st, v) in zip(states(sp), s.state)
+            setvalue!(st, v)
+        end
     end
 end
 
