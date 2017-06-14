@@ -5,6 +5,7 @@ makedocs(
     sitename = "SDDP",
     pages = [
         "Introduction" => "index.md",
+        "Quick Start" => "quick.md",
         "Tutorial" => "tutorial.md"
     ]
 )
