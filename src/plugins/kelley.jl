@@ -1,7 +1,7 @@
 
 using LinearAlgebra
 
-function _kelley(node::Node, dual_vars::Vector{Float64}, integrality_handler::SDDiP, mip_obj::Float64)
+function _solve_primal!(subgradients::Vector{Float64}, node::Node, dual_vars::Vector{Float64}, slacks)
     model = node.subproblem
     old_obj = JuMP.objective_function(model)
     # Set the Lagrangian the objective in the primal model
@@ -17,7 +17,7 @@ function _kelley(node::Node, dual_vars::Vector{Float64}, integrality_handler::SD
     return lagrangian_obj
 end
 
-function _kelley(node::Node, dual_vars::Vector{Float64}, integrality_handler::SDDiP)
+function _kelley(node::Node, dual_vars::Vector{Float64}, integrality_handler::SDDiP, mip_obj::Float64)
     model = node.subproblem
     # Assume the model has been solved. Solving the MIP is usually very quick
     # relative to solving for the Lagrangian duals, so we cheat and use the
