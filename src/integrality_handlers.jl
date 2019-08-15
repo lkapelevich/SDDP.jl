@@ -52,6 +52,22 @@ function update_integrality_handler!(integrality_handler::SDDiP, optimizer::JuMP
     return integrality_handler
 end
 
+function flip_rhs!(states)
+    for (name, state) in states
+        JuMP.fix(state.in, JuMP.fix_value(state.in) > 0.5 ? 0 : 1, force = true)
+    end
+    return states
+end
+
+function get_infeasible_dual(pi::Float64, x::Float64, sense::MOI.OptimizationSense)
+    y = (sense == MOI.MIN_SENSE ? x : 1 - x)
+    return (y < 0.5 ? perturb(pi) : -perturb(-pi))
+end
+
+# Perturb the numerical gradient to get an infeasible dual- scaling by 1.1
+# completely arbitrary, need any constaint > 1
+perturb(pi::Float64) = (pi > 0 ? 1.1 * pi : 1)
+
 const _log2inv = inv(log(2))
 
 function binexpand!(y::Vector{Int}, x::Int)

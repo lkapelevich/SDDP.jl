@@ -160,7 +160,7 @@ end
 # Internal function: get the values of the dual variables associated with the
 # fixed incoming state variables. Requires node.subproblem to have been solved
 # with DualStatus == FeasiblePoint.
-function get_dual_variables(node::Node, ::AbstractIntegralityHandler)
+function get_dual_variables(node::Node, ::AbstractIntegralityHandler, ::Float64)
     # Note: due to JuMP's dual convention, we need to flip the sign for
     # maximization problems.
     dual_values = Dict{Symbol, Float64}()
@@ -175,18 +175,40 @@ function get_dual_variables(node::Node, ::AbstractIntegralityHandler)
     return dual_values
 end
 
-function get_dual_variables(node::Node, integrality_handler::SDDiP)
+function get_dual_variables(node::Node, integrality_handler::SDDiP, solver_obj::Float64)
     dual_values = Dict{Symbol, Float64}()
     # TODO implement smart choice for initial duals
     dual_vars = zeros(length(node.states))
-    solver_obj = JuMP.objective_value(node.subproblem)
-    kelley_obj = _kelley(node, dual_vars, integrality_handler)
+    initialize_duals!(dual_vars, node)
+    # solver_obj = JuMP.objective_value(node.subproblem)
+    kelley_obj = _kelley(node, dual_vars, integrality_handler, solver_obj)
     # TODO return consistent error to AbstractIntegralityHandler method
     @assert isapprox(solver_obj, kelley_obj, atol = 1e-5, rtol = 1e-5)
     for (i, name) in enumerate(keys(node.states))
         dual_values[name] = -dual_vars[i]
     end
     return dual_values
+end
+
+# Need to use simplex (not IP) in Kelley for this to be effective
+function initialize_duals!(dual_vars, node::Node)
+    model = node.subproblem
+    # Actual function evaluated at given state
+    current_obj = JuMP.objective_value(model)
+    # Flip the RHS of all constraints corresponding to all state variables
+    flip_rhs!(node.states)
+    # Evaluate objective at this alternative state, gives numerical subgradient
+    JuMP.optimize!(model)
+    diff = objective_value(model) - current_obj
+    # Change RHS back
+    flip_rhs!(node.states)
+    # Make duals initially infeasible by considering our one other evaluation
+    for (i, (name, state)) in enumerate(node.states)
+        numerical_gradient = (JuMP.fix_value(state.in) > 0.5 ? diff : -diff)
+        # The Lagrangian multiplier is the negative of the LP dual = rate of change
+        dual_vars[i] = -get_infeasible_dual(numerical_gradient, JuMP.fix_value(state.in), JuMP.objective_sense(model))
+    end
+    return dual_vars
 end
 
 # Internal function: set the objective of node to the stage objective, plus the
@@ -294,19 +316,18 @@ function solve_subproblem(
     if JuMP.primal_status(node.subproblem) != JuMP.MOI.FEASIBLE_POINT
         write_subproblem_to_file(node, "subproblem", throw_error = true)
     end
+    state = get_outgoing_state(node)
+    stage_objective = stage_objective_value(node.stage_objective)
+    objective = JuMP.objective_value(node.subproblem) # TODO MOI/solver issue? can't access objective after modifications using Gurobi/CPLEX, OK with GLPK
     # If require_duals = true, check for dual feasibility and return a dict with
     # the dual on the fixed constraint associated with each incoming state
     # variable. If require_duals=false, return an empty dictionary for
     # type-stability.
     dual_values = if require_duals
-        get_dual_variables(node, node.integrality_handler)
+        get_dual_variables(node, node.integrality_handler, objective)
     else
         Dict{Symbol, Float64}()
     end
-
-    state = get_outgoing_state(node)
-    stage_objective = stage_objective_value(node.stage_objective)
-    objective = JuMP.objective_value(node.subproblem)
 
     if node.post_optimize_hook !== nothing
         node.post_optimize_hook(pre_optimize_ret)

@@ -1,7 +1,7 @@
 
 using LinearAlgebra
 
-function _solve_primal!(subgradients::Vector{Float64}, node::Node, dual_vars::Vector{Float64}, slacks)
+function _kelley(node::Node, dual_vars::Vector{Float64}, integrality_handler::SDDiP, mip_obj::Float64)
     model = node.subproblem
     old_obj = JuMP.objective_function(model)
     # Set the Lagrangian the objective in the primal model
@@ -22,7 +22,7 @@ function _kelley(node::Node, dual_vars::Vector{Float64}, integrality_handler::SD
     # relative to solving for the Lagrangian duals, so we cheat and use the
     # solved model's objective as our bound while searching for the optimal duals
     @assert JuMP.termination_status(model) == MOI.OPTIMAL
-    obj = JuMP.objective_value(model)
+    obj = mip_obj
 
     for (i, (name, state)) in enumerate(node.states)
         integrality_handler.old_rhs[i] = JuMP.fix_value(state.in)
